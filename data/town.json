@@ -1,0 +1,400 @@
+{
+  "schema_version": 1,
+  "width": 34,
+  "height": 23,
+  "tile": 16,
+  "buildings": [
+    {
+      "id": "library",
+      "name": "橡树图书馆",
+      "rect": [
+        3,
+        2,
+        8,
+        5
+      ],
+      "door": [
+        7,
+        7
+      ]
+    },
+    {
+      "id": "cafe",
+      "name": "余烬咖啡馆",
+      "rect": [
+        14,
+        2,
+        7,
+        5
+      ],
+      "door": [
+        17,
+        7
+      ]
+    },
+    {
+      "id": "school",
+      "name": "青藤学堂",
+      "rect": [
+        24,
+        2,
+        7,
+        5
+      ],
+      "door": [
+        27,
+        7
+      ]
+    },
+    {
+      "id": "home_mia",
+      "name": "米娅的小屋",
+      "rect": [
+        3,
+        15,
+        5,
+        4
+      ],
+      "door": [
+        5,
+        19
+      ]
+    },
+    {
+      "id": "home_oliver",
+      "name": "奥利弗的小屋",
+      "rect": [
+        11,
+        15,
+        5,
+        4
+      ],
+      "door": [
+        13,
+        19
+      ]
+    },
+    {
+      "id": "studio",
+      "name": "林间工作室",
+      "rect": [
+        19,
+        15,
+        5,
+        4
+      ],
+      "door": [
+        21,
+        19
+      ]
+    }
+  ],
+  "places": {
+    "library": {
+      "name": "橡树图书馆",
+      "cell": [
+        7,
+        7
+      ]
+    },
+    "cafe": {
+      "name": "余烬咖啡馆",
+      "cell": [
+        17,
+        7
+      ]
+    },
+    "school": {
+      "name": "青藤学堂",
+      "cell": [
+        27,
+        7
+      ]
+    },
+    "home_mia": {
+      "name": "米娅的小屋",
+      "cell": [
+        5,
+        19
+      ]
+    },
+    "home_oliver": {
+      "name": "奥利弗的小屋",
+      "cell": [
+        13,
+        19
+      ]
+    },
+    "studio": {
+      "name": "林间工作室",
+      "cell": [
+        21,
+        19
+      ]
+    },
+    "park": {
+      "name": "橡树公园",
+      "cell": [
+        8,
+        11
+      ]
+    },
+    "square": {
+      "name": "中央广场",
+      "cell": [
+        17,
+        12
+      ]
+    },
+    "lake": {
+      "name": "月牙湖畔",
+      "cell": [
+        27,
+        17
+      ]
+    }
+  },
+  "solid_rects": [
+    [
+      28,
+      15,
+      4,
+      5
+    ],
+    [
+      17,
+      10,
+      2,
+      2
+    ],
+    [
+      6,
+      10,
+      2,
+      1
+    ],
+    [
+      20,
+      10,
+      2,
+      1
+    ]
+  ],
+  "trees": [
+    [
+      1,
+      1
+    ],
+    [
+      12,
+      2
+    ],
+    [
+      22,
+      2
+    ],
+    [
+      32,
+      2
+    ],
+    [
+      1,
+      5
+    ],
+    [
+      32,
+      6
+    ],
+    [
+      2,
+      9
+    ],
+    [
+      11,
+      9
+    ],
+    [
+      22,
+      9
+    ],
+    [
+      31,
+      10
+    ],
+    [
+      3,
+      12
+    ],
+    [
+      11,
+      12
+    ],
+    [
+      23,
+      12
+    ],
+    [
+      1,
+      16
+    ],
+    [
+      9,
+      16
+    ],
+    [
+      17,
+      16
+    ],
+    [
+      25,
+      20
+    ],
+    [
+      2,
+      21
+    ],
+    [
+      9,
+      21
+    ],
+    [
+      17,
+      21
+    ],
+    [
+      23,
+      21
+    ],
+    [
+      31,
+      21
+    ]
+  ],
+  "residents": [
+    {
+      "id": "mia",
+      "name": "米娅",
+      "role": "图书管理员",
+      "color": "d59a83",
+      "home": "home_mia",
+      "bio": "喜欢旧书、手写信和清晨的阳光。\n正在整理小镇的口述历史。",
+      "schedule": [
+        {
+          "time": 0,
+          "place": "home_mia",
+          "activity": "在家读书"
+        },
+        {
+          "time": 480,
+          "place": "library",
+          "activity": "整理书架"
+        },
+        {
+          "time": 660,
+          "place": "cafe",
+          "activity": "喝一杯拿铁"
+        },
+        {
+          "time": 780,
+          "place": "library",
+          "activity": "修复旧书"
+        },
+        {
+          "time": 1020,
+          "place": "park",
+          "activity": "公园散步"
+        },
+        {
+          "time": 1140,
+          "place": "home_mia",
+          "activity": "回家读书"
+        }
+      ]
+    },
+    {
+      "id": "oliver",
+      "name": "奥利弗",
+      "role": "咖啡师",
+      "color": "96b9b6",
+      "home": "home_oliver",
+      "bio": "用一杯热咖啡记住每个人的故事。\n午后常到湖边寻找新菜单的灵感。",
+      "schedule": [
+        {
+          "time": 0,
+          "place": "home_oliver",
+          "activity": "在家休息"
+        },
+        {
+          "time": 480,
+          "place": "cafe",
+          "activity": "准备开店"
+        },
+        {
+          "time": 720,
+          "place": "square",
+          "activity": "午间休息"
+        },
+        {
+          "time": 780,
+          "place": "cafe",
+          "activity": "烘焙咖啡豆"
+        },
+        {
+          "time": 1020,
+          "place": "lake",
+          "activity": "湖边放空"
+        },
+        {
+          "time": 1140,
+          "place": "home_oliver",
+          "activity": "收工回家"
+        }
+      ]
+    },
+    {
+      "id": "leo",
+      "name": "里奥",
+      "role": "艺术系学生",
+      "color": "c2c591",
+      "home": "studio",
+      "bio": "随身带着画本，收集小镇的颜色。\n梦想为每一位居民画一幅肖像。",
+      "schedule": [
+        {
+          "time": 0,
+          "place": "studio",
+          "activity": "整理画具"
+        },
+        {
+          "time": 480,
+          "place": "school",
+          "activity": "参加绘画课"
+        },
+        {
+          "time": 660,
+          "place": "park",
+          "activity": "树下写生"
+        },
+        {
+          "time": 780,
+          "place": "cafe",
+          "activity": "与朋友碰面"
+        },
+        {
+          "time": 900,
+          "place": "studio",
+          "activity": "创作新作品"
+        },
+        {
+          "time": 1080,
+          "place": "lake",
+          "activity": "记录落日"
+        },
+        {
+          "time": 1200,
+          "place": "studio",
+          "activity": "回工作室休息"
+        }
+      ]
+    }
+  ]
+}

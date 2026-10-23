@@ -243,8 +243,7 @@ def actor(name,hair,shirt,pants,skin):
             sheet.alpha_composite(sprite,(frame*16,direction*24))
     sheet.save(OUT / (name+".png"))
 
-actor("player","#725241","#c5a16b","#5a756c","#ecc8a0")
 actor("mia","#754b39","#c5846e","#746b59","#ebc59e")
 actor("oliver","#4e5144","#7c9a99","#5f665b","#dbb38c")
 actor("leo","#c49a58","#b0b17b","#766c5b","#f0cda6")
-print("Generated town.png and four original character sprite sheets.")
+print("Generated town.png and three original NPC sprite sheets.")

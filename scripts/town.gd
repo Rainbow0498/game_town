@@ -5,33 +5,13 @@ const MAP_SCALE := 2.0
 const INK := Color("e6e4d4")
 const MUTED := Color("93a69a")
 const GOLD := Color("dbbd83")
-const DATA := [
-	{"id":"mia", "name":"米娅", "role":"图书管理员", "color":"d59a83", "home":"home_mia", "bio":"喜欢旧书、手写信和清晨的阳光。\n正在整理小镇的口述历史。", "schedule":[
-		{"time":0,"place":"home_mia","activity":"在家读书"}, {"time":480,"place":"library","activity":"整理书架"},
-		{"time":660,"place":"cafe","activity":"喝一杯拿铁"}, {"time":780,"place":"library","activity":"修复旧书"},
-		{"time":1020,"place":"park","activity":"公园散步"}, {"time":1140,"place":"home_mia","activity":"回家读书"}]},
-	{"id":"oliver", "name":"奥利弗", "role":"咖啡师", "color":"96b9b6", "home":"home_oliver", "bio":"用一杯热咖啡记住每个人的故事。\n午后常到湖边寻找新菜单的灵感。", "schedule":[
-		{"time":0,"place":"home_oliver","activity":"在家休息"}, {"time":480,"place":"cafe","activity":"准备开店"},
-		{"time":720,"place":"square","activity":"午间休息"}, {"time":780,"place":"cafe","activity":"烘焙咖啡豆"},
-		{"time":1020,"place":"lake","activity":"湖边放空"}, {"time":1140,"place":"home_oliver","activity":"收工回家"}]},
-	{"id":"leo", "name":"里奥", "role":"艺术系学生", "color":"c2c591", "home":"studio", "bio":"随身带着画本，收集小镇的颜色。\n梦想为每一位居民画一幅肖像。", "schedule":[
-		{"time":0,"place":"studio","activity":"整理画具"}, {"time":480,"place":"school","activity":"参加绘画课"},
-		{"time":660,"place":"park","activity":"树下写生"}, {"time":780,"place":"cafe","activity":"与朋友碰面"},
-		{"time":900,"place":"studio","activity":"创作新作品"}, {"time":1080,"place":"lake","activity":"记录落日"},
-		{"time":1200,"place":"studio","activity":"回工作室休息"}]}
-]
+var DATA: Array = TownWorld.definition.residents
 
 var world := TownWorld.new()
 var residents: Array[TownResident] = []
 var town_texture: Texture2D = preload("res://assets/town.png")
-var player_texture: Texture2D = preload("res://assets/player.png")
 var font: SystemFont
 var serif: SystemFont
-var player := Vector2(264, 216)
-var player_route := PackedVector2Array()
-var player_facing := 0
-var player_anim := 0.0
-var player_moving := false
 var minute := 470.0
 var day := 1
 var speed_factor := 1.0
@@ -39,8 +19,7 @@ var paused := false
 var show_routes := true
 var selected := 0
 var elapsed := 0.0
-var hover_cell := Vector2i(-1, -1)
-var feedback := "欢迎来到橡树镇。去认识一位新邻居吧。"
+var feedback := "观察居民的日常，按 J 查看全部角色日志。"
 var feedback_timer := 6.0
 var clock_label: Label
 var period_label: Label
@@ -63,6 +42,23 @@ var ui_timer := 0.0
 var toast: Panel
 var toast_label: Label
 var help_dialog: AcceptDialog
+var request: HTTPRequest
+var api_queue: Array[Dictionary] = []
+var active_request: Dictionary = {}
+var api_busy := false
+var connected := false
+var poll_timer := 0.0
+var backend_pid := -1
+var auto_start_attempted := false
+var journal_label: Label
+var journal_panel: Panel
+var journal_visible := true
+var journal_filter := ""
+var latest_snapshot := 0
+var world_revision := 0
+var world_period := "清晨"
+var journal_filter_button: Button
+const API := "http://127.0.0.1:8765"
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -72,6 +68,11 @@ func _ready() -> void:
 	serif.font_names = PackedStringArray(["Georgia", "serif"])
 	for data in DATA: residents.append(TownResident.new(data, world))
 	_build_ui()
+	request = HTTPRequest.new()
+	request.timeout = 3.0
+	add_child(request)
+	request.request_completed.connect(_on_response)
+	_enqueue("/world")
 	_update_ui()
 	if "--smoke-test" in OS.get_cmdline_user_args(): _run_smoke_test.call_deferred()
 
@@ -135,7 +136,7 @@ func _build_ui() -> void:
 	title.add_theme_font_override("font", serif)
 	_label(root, "橡 树 镇   /   A LITTLE LIFE, WELL LIVED", Vector2(90, 55), 12, MUTED)
 	_panel(root, Rect2(399, 27, 154, 35), Color("293c30"), Color("4b6045"), 18)
-	_label(root, "●  自由探索 · 校园小镇", Vector2(413, 35), 12, Color("bac998"))
+	_label(root, "●  居民观察 · 校园小镇", Vector2(413, 35), 12, Color("bac998"))
 	_label(root, "晴  /  22°C", Vector2(602, 24), 20, GOLD)
 	_label(root, "微风经过橡树的午后", Vector2(603, 55), 12, MUTED)
 	day_label = _label(root, "春 01 日 · 星期一", Vector2(832, 27), 15, INK)
@@ -157,7 +158,7 @@ func _build_ui() -> void:
 	_panel(root, Rect2(42, 136, 164, 31), Color("263b30d9"), Color("657b52"), 5)
 	_label(root, "●  OAK & EMBER / 镇区", Vector2(53, 144), 10, Color("dedec0"))
 	_panel(root, Rect2(42, 803, 225, 32), Color("263b30e8"), Color("647653"), 5)
-	_label(root, "✦  你   ·   3 位居民   ·   9 处地点", Vector2(55, 811), 11, Color("e2dabe"))
+	_label(root, "●  观察模式 · 3 位居民 · 9 处地点", Vector2(55, 811), 11, Color("e2dabe"))
 	toast = _panel(root, Rect2(291, 795, 801, 41), Color("263b30eb"), Color("647653"), 5)
 	toast_label = _label(toast, "", Vector2(13, 4), 12, Color("e2dabe"))
 	toast_label.size = Vector2(775, 33)
@@ -191,161 +192,174 @@ func _build_ui() -> void:
 		var yy := 537 + i * 30
 		schedule_times.append(_label(root, "", Vector2(1157, yy), 12, MUTED))
 		schedule_labels.append(_label(root, "", Vector2(1220, yy), 12, MUTED))
-	follow_button = _button(root, "寻找米娅  →", Rect2(1156, 775, 240, 34), _go_to_selected)
-	_label(root, "点击居民查看信息 · E 与附近居民交谈", Vector2(1156, 823), 10, MUTED)
-	# Footer: controls and speed stay visible for quick acceptance testing.
-	_label(root, "W A S D / 方向键", Vector2(25, 873), 12, GOLD)
-	_label(root, "移动", Vector2(156, 873), 12, MUTED)
-	_label(root, "鼠标左键", Vector2(205, 873), 12, GOLD)
-	_label(root, "寻路 / 查看居民", Vector2(278, 873), 12, MUTED)
-	status_label = _label(root, "", Vector2(424, 873), 11, MUTED)
+	follow_button = _button(root, "查看米娅的日常  →", Rect2(1156, 775, 240, 34), _show_selected_log)
+	_label(root, "点击居民查看信息 · Tab 切换观察对象", Vector2(1156, 823), 10, MUTED)
+	journal_panel = _panel(root, Rect2(42, 585, 640, 202), Color("1d3027f5"), Color("6a7954"), 8)
+	journal_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_label(journal_panel, "小 镇 日 志", Vector2(16, 11), 15, GOLD)
+	journal_filter_button = _button(journal_panel, "全部居民", Rect2(434, 9, 93, 27), _cycle_log_filter)
+	_button(journal_panel, "收起", Rect2(537, 9, 85, 27), _toggle_journal)
+	journal_label = _label(journal_panel, "正在连接小镇世界……", Vector2(16, 48), 12, INK)
+	journal_label.size = Vector2(608, 145)
+	journal_label.clip_text = true
+	_label(root, "点击居民 / Tab 观察", Vector2(25, 873), 12, GOLD)
+	_button(root, "日志 J", Rect2(196, 865, 77, 28), _toggle_journal)
+	_button(root, "保存", Rect2(281, 865, 64, 28), _save)
+	_button(root, "恢复", Rect2(353, 865, 64, 28), _restore_latest)
+	status_label = _label(root, "", Vector2(436, 873), 11, MUTED)
 	pause_button = _button(root, "Ⅱ", Rect2(954, 865, 38, 28), _toggle_pause)
 	for i in range(3):
 		var value: float = [1.0, 4.0, 12.0][i]
 		speed_buttons.append(_button(root, "%d×" % value, Rect2(1000 + i * 48, 865, 42, 28), _set_speed.bind(value)))
 	_button(root, "+1h", Rect2(1146, 865, 55, 28), _skip_hour)
 	route_button = _button(root, "路线 · 开", Rect2(1210, 865, 91, 28), _toggle_routes)
-	_button(root, "重置", Rect2(1310, 865, 106, 28), _reset)
+	_button(root, "新世界", Rect2(1310, 865, 106, 28), _reset)
 
 func _process(delta: float) -> void:
 	elapsed += delta
 	feedback_timer = maxf(0, feedback_timer - delta)
-	if not paused:
-		minute += delta * 2.0 * speed_factor
-		while minute >= 1440:
-			minute -= 1440
-			day += 1
-		for npc in residents:
-			npc.sync_schedule(minute, day, world)
-			npc.tick(delta * speed_factor)
-	_update_player(delta)
-	hover_cell = world.cell((get_global_mouse_position() - ORIGIN) / MAP_SCALE)
+	poll_timer += delta
+	if poll_timer >= 0.25 and not api_busy and api_queue.is_empty():
+		poll_timer = 0
+		_enqueue("/world")
+	if not api_busy and not api_queue.is_empty(): _send_next()
 	ui_timer += delta
 	if ui_timer >= 0.12:
 		ui_timer = 0
 		_update_ui()
 	queue_redraw()
 
-func _update_player(delta: float) -> void:
-	player_anim += delta
-	var direction := Vector2i.ZERO
-	if Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT): direction = Vector2i.LEFT
-	elif Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT): direction = Vector2i.RIGHT
-	elif Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP): direction = Vector2i.UP
-	elif Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN): direction = Vector2i.DOWN
-	if direction != Vector2i.ZERO:
-		if player_route.size() > 1: player_route.resize(1)
-		if player_route.is_empty():
-			var next := world.cell(player) + direction
-			player_facing = 1 if direction.x < 0 else (2 if direction.x > 0 else (3 if direction.y < 0 else 0))
-			if world.walkable(next): player_route.append(world.center(next))
-	player_moving = not player_route.is_empty()
-	var budget := delta * 65.0
-	while budget > 0 and not player_route.is_empty():
-		var difference := player_route[0] - player
-		if difference.length() > 0.1:
-			if abs(difference.x) > abs(difference.y): player_facing = 2 if difference.x > 0 else 1
-			else: player_facing = 0 if difference.y > 0 else 3
-		var distance := difference.length()
-		if distance <= budget:
-			player = player_route[0]
-			player_route.remove_at(0)
-			budget -= distance
-		else:
-			player += difference.normalized() * budget
-			budget = 0
-
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var local := (get_global_mouse_position() - ORIGIN) / MAP_SCALE
-		if not Rect2(Vector2.ZERO, Vector2(TownWorld.SIZE * 16)).has_point(local): return
 		for i in residents.size():
 			if local.distance_to(residents[i].position - Vector2(0, 7)) < 13:
 				_select(i)
 				return
-		_walk_to(world.cell(local))
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
 			KEY_SPACE: _toggle_pause()
 			KEY_TAB: _select((selected + 1) % residents.size())
-			KEY_E: _interact()
-			KEY_ESCAPE: player_route.clear()
 			KEY_R: _toggle_routes()
-
-func _walk_to(destination: Vector2i) -> void:
-	if not world.walkable(destination):
-		_notify("这里无法通行，请点击道路或草地。")
-		return
-	var route := world.path(player, destination)
-	if route.is_empty():
-		_notify("无法到达这里。")
-		return
-	player_route = route
-	if player.distance_to(player_route[0]) < 0.1: player_route.remove_at(0)
-	_notify("正在前往标记地点 · Esc 取消")
+			KEY_J: _toggle_journal()
 
 func _select(index: int) -> void:
 	selected = index
 	_update_ui()
 
-func _go_to_selected() -> void:
-	_walk_to(world.cell(residents[selected].position))
-	_notify("前往%s当前所在的位置。" % residents[selected].display_name)
-
-func _interact() -> void:
-	var nearest := -1
-	var distance := 36.0
-	for i in residents.size():
-		var test_distance := player.distance_to(residents[i].position)
-		if test_distance < distance:
-			distance = test_distance
-			nearest = i
-	if nearest >= 0:
-		_select(nearest)
-		_notify(["米娅：早安！图书馆总有一个位置留给你。", "奥利弗：想喝点什么？今天的咖啡豆很香。", "里奥：你看，今天的树影像不像一幅画？"][nearest])
-	else: _notify("靠近居民后按 E，就可以打个招呼。")
-
 func _toggle_pause() -> void:
-	paused = not paused
-	_update_ui()
+	_enqueue("/clock", {"paused": not paused}, true)
 
 func _set_speed(value: float) -> void:
-	speed_factor = value
-	_update_ui()
+	_enqueue("/clock", {"speed": int(value)}, true)
 
 func _skip_hour() -> void:
-	minute += 60
-	if minute >= 1440:
-		minute -= 1440
-		day += 1
-	for npc in residents: npc.sync_schedule(minute, day, world)
-	_notify("已快进 1 小时，居民正按日程前往下一站。")
-	_update_ui()
+	_enqueue("/advance", {"minutes": 60}, true)
 
 func _toggle_routes() -> void:
 	show_routes = not show_routes
 	_update_ui()
 
 func _reset() -> void:
-	minute = 470
-	day = 1
-	paused = false
-	speed_factor = 1
-	player = world.center(Vector2i(16, 13))
-	player_route.clear()
-	residents.clear()
-	for data in DATA: residents.append(TownResident.new(data, world))
-	_notify("新的一天开始了。早安，橡树镇。")
+	_enqueue("/reset", {"start_minute": 470}, true)
+
+func _save() -> void:
+	_enqueue("/save", {"name": "第%d天 %s 手动存档" % [day, _time(minute)]}, true)
+
+func _restore_latest() -> void:
+	_enqueue("/snapshots")
+
+func _toggle_journal() -> void:
+	journal_visible = not journal_visible
+	journal_panel.visible = journal_visible
+
+func _show_selected_log() -> void:
+	journal_filter = residents[selected].id
+	journal_visible = true
+	journal_panel.visible = true
+	_fetch_events()
+
+func _cycle_log_filter() -> void:
+	var ids: Array = ["", "mia", "oliver", "leo"]
+	journal_filter = ids[(ids.find(journal_filter) + 1) % ids.size()]
+	_fetch_events()
+
+func _fetch_events() -> void:
+	_enqueue("/events?latest=true&limit=6" + ("&npc=" + journal_filter if journal_filter != "" else ""))
+
+func _enqueue(path: String, body: Dictionary = {}, post: bool = false) -> void:
+	api_queue.append({"path": path, "body": body, "post": post})
+
+func _send_next() -> void:
+	active_request = api_queue.pop_front()
+	api_busy = true
+	var method := HTTPClient.METHOD_POST if active_request.post else HTTPClient.METHOD_GET
+	var error := request.request(API + active_request.path, PackedStringArray(["Content-Type: application/json"]), method, JSON.stringify(active_request.body) if active_request.post else "")
+	if error != OK:
+		api_busy = false
+		connected = false
+
+func _on_response(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	api_busy = false
+	if result != HTTPRequest.RESULT_SUCCESS:
+		connected = false
+		if not auto_start_attempted:
+			auto_start_attempted = true
+			var python := OS.get_environment("TOWN_PYTHON")
+			if python.is_empty(): python = "D:/Anaconda3/python.exe" if FileAccess.file_exists("D:/Anaconda3/python.exe") else "python"
+			var args := PackedStringArray([ProjectSettings.globalize_path("res://backend/server.py")])
+			if not OS.get_environment("TOWN_DB_PATH").is_empty(): args.append_array(PackedStringArray(["--db", OS.get_environment("TOWN_DB_PATH")]))
+			backend_pid = OS.create_process(python, args, false)
+		_notify("正在启动本地世界服务，现有存档会自动载入。")
+		return
+	var data = JSON.parse_string(body.get_string_from_utf8())
+	if code != 200:
+		_notify("操作失败：" + str(data.get("error", code)) if data is Dictionary else "世界服务返回错误")
+		return
+	if not connected: _notify("世界已连接，居民日常会自动记录；按 J 查看日志。")
+	connected = true
+	if active_request.path == "/snapshots":
+		if data.is_empty(): _notify("还没有存档，请先保存。")
+		else: _enqueue("/restore", {"snapshot_id": int(data[0].id)}, true)
+		return
+	if str(active_request.path).begins_with("/events"):
+		_display_events(data.events)
+		return
+	if data.has("snapshot_id"):
+		latest_snapshot = int(data.snapshot_id)
+		_notify("存档 #%d 已保存到本地数据库。" % latest_snapshot)
+		data = data.state
+	if data.has("npcs"):
+		minute = float(data.minute)
+		day = int(data.day)
+		paused = data.paused
+		speed_factor = float(data.speed)
+		world_revision = int(data.revision)
+		world_period = data.period
+		for i in residents.size(): residents[i].apply_state(data.npcs[i])
+		if journal_filter == "": _display_events(data.recent_events)
+		elif api_queue.is_empty(): _fetch_events()
+	if active_request.path == "/restore": _notify("已恢复存档：时间、位置、路线、日程和日志已同步。")
 	_update_ui()
+
+func _display_events(events: Array) -> void:
+	var lines := PackedStringArray()
+	for event in events:
+		lines.append("第%d天  %s   %s" % [int(event.day), _time(float(event.minute)), event.message])
+	journal_label.text = "\n".join(lines) if not lines.is_empty() else "该角色暂无日志。"
+	journal_filter_button.text = "全部居民" if journal_filter == "" else str(DATA[["mia", "oliver", "leo"].find(journal_filter)].name)
+
+func _exit_tree() -> void:
+	if backend_pid > 0: OS.kill(backend_pid)
 
 func _show_help() -> void:
 	if not is_instance_valid(help_dialog):
 		help_dialog = AcceptDialog.new()
 		help_dialog.title = "欢迎来到橡树镇 · 操作说明"
-		help_dialog.dialog_text = "WASD / 方向键    四方向移动，遇到障碍会停下\n\n鼠标左键    点击道路或草地，自动寻路\n点击居民 / Tab    查看或切换居民信息\nE    与附近的居民打招呼\nEsc    取消玩家当前的行走路线\n\n空格    暂停 / 继续小镇时间，玩家仍可探索\n1× / 4× / 12×    调整时间与居民行走速度\n+1h    快进一小时，观察日程变化\nR    显示 / 隐藏居民路线\n\n居民每天按固定日程活动，跨日后自动循环。\n本阶段建筑采用剖面展示，活动地点位于建筑门前。"
+		help_dialog.dialog_text = "小镇现在只有 NPC，你以观察者身份查看他们的生活。\n\n点击居民 / Tab    查看或切换居民信息\nJ    显示 / 隐藏日常日志，支持按角色筛选\n空格    暂停 / 继续统一游戏时间\n1× / 4× / 12×    调整模拟速度\n+1h    完整模拟一小时，不跳过任何活动\nR    显示 / 隐藏居民路线\n\n保存    将完整世界状态与事件记录写入 SQLite\n恢复    载入最新手动存档，并从保存的路线继续行走\n\n窗口与无界面模式共用本地世界服务。\n若无法连接，请先运行 backend/server.py。"
 		help_dialog.add_theme_font_override("font", font)
 		help_dialog.add_theme_font_size_override("font_size", 16)
-		help_dialog.ok_button_text = "开始散步"
+		help_dialog.ok_button_text = "开始观察"
 		add_child(help_dialog)
 	help_dialog.popup_centered(Vector2i(580, 520))
 
@@ -360,7 +374,7 @@ func _update_ui() -> void:
 	if not is_instance_valid(clock_label): return
 	clock_label.text = _time(minute)
 	day_label.text = "春 %02d 日 · 星期%s" % [day, ["一", "二", "三", "四", "五", "六", "日"][(day - 1) % 7]]
-	period_label.text = "已暂停 · 玩家仍可探索" if paused else ("清晨 · 小镇正在醒来" if minute < 660 else ("白昼 · 各自忙碌的日常" if minute < 1020 else "傍晚 · 慢慢走回家"))
+	period_label.text = "世界服务未连接" if not connected else ("已暂停 · 世界状态已保存" if paused else world_period + " · 居民各自忙碌")
 	var npc := residents[selected]
 	name_label.text = npc.display_name
 	name_label.add_theme_color_override("font_color", npc.color)
@@ -386,11 +400,11 @@ func _update_ui() -> void:
 	for i in resident_buttons.size():
 		resident_buttons[i].add_theme_color_override("font_color", residents[i].color if i == selected else MUTED)
 		resident_buttons[i].text = ("● " if i == selected else "") + residents[i].display_name
-	follow_button.text = "寻找%s  →" % npc.display_name
+	follow_button.text = "查看%s的日常  →" % npc.display_name
 	pause_button.text = "▶" if paused else "Ⅱ"
 	for i in speed_buttons.size(): speed_buttons[i].add_theme_color_override("font_color", GOLD if speed_factor == [1, 4, 12][i] else MUTED)
 	route_button.text = "路线 · " + ("开" if show_routes else "关")
-	status_label.text = feedback if feedback_timer > 0 else "日常在继续，故事正发生。"
+	status_label.text = "世界已连接 · 状态 #%d · SQLite 持久化" % world_revision if connected else "等待本地世界服务……"
 	toast.visible = feedback_timer > 0
 	toast_label.text = feedback
 	# Keep long hints within the footer's available width.
@@ -406,17 +420,8 @@ func _draw() -> void:
 				var points := PackedVector2Array([npc.position])
 				points.append_array(npc.route)
 				if points.size() > 1: draw_polyline(points, Color(npc.color, 0.50), 1.0, false)
-	if player_route.size() > 0:
-		var points := PackedVector2Array([player])
-		points.append_array(player_route)
-		if points.size() > 1: draw_polyline(points, Color("f6e1ac"), 1.0, false)
-		var goal := player_route[-1]
-		draw_arc(goal, 5 + sin(elapsed * 4), 0, TAU, 16, GOLD, 1.0)
-	if world.walkable(hover_cell):
-		draw_rect(Rect2(Vector2(hover_cell * 16) + Vector2(1, 1), Vector2(14, 14)), Color(1, 0.95, 0.7, 0.25), false, 1)
-	# Sort actors by their feet for correct overlap.
+	# Only NPCs are rendered; no player or controllable actor exists.
 	var actors: Array[Dictionary] = []
-	actors.append({"pos":player, "texture":player_texture, "facing":player_facing, "anim":player_anim, "moving":player_moving, "index":-1})
 	for i in residents.size():
 		var npc := residents[i]
 		actors.append({"pos":npc.position, "texture":npc.texture, "facing":npc.facing, "anim":npc.animation_time, "moving":npc.moving, "index":i})
@@ -427,8 +432,8 @@ func _draw() -> void:
 		if actor.index == selected: draw_arc(pos + Vector2(0, 1), 6, 0, TAU, 16, residents[selected].color, 1)
 		var frame := int(actor.anim * 8) % 3 if actor.moving else 0
 		draw_texture_rect_region(actor.texture, Rect2(pos - Vector2(8, 20), Vector2(16, 24)), Rect2(frame * 16, actor.facing * 24, 16, 24))
-		var title := "你" if actor.index == -1 else residents[actor.index].display_name
-		var color := GOLD if actor.index == -1 else residents[actor.index].color
+		var title: String = residents[actor.index].display_name
+		var color: Color = residents[actor.index].color
 		var width := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 7).x + 8
 		draw_style_box(_tag_style(), Rect2(pos.x - width / 2, pos.y - 32, width, 11))
 		draw_string(font, pos + Vector2(-width / 2 + 4, -24), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 7, color)
@@ -453,11 +458,16 @@ func _run_smoke_test() -> void:
 	# A real rendered frame catches missing imports, broken UI and drawing errors.
 	await get_tree().process_frame
 	await get_tree().process_frame
-	minute = 510
-	for npc in residents:
-		npc.sync_schedule(minute, day, world)
-		npc.tick(5)
-	_walk_to(Vector2i(17, 12))
+	for attempt in range(100):
+		if connected: break
+		await get_tree().create_timer(0.1).timeout
+	if not connected:
+		push_error("SMOKE FAILED: world API did not connect")
+		get_tree().quit(1)
+		return
+	_enqueue("/clock", {"paused": true}, true)
+	_enqueue("/advance", {"minutes": 50}, true)
+	while api_busy or not api_queue.is_empty(): await get_tree().process_frame
 	_update_ui()
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw

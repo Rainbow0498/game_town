@@ -3,24 +3,28 @@ extends RefCounted
 
 const TILE := 16
 const SIZE := Vector2i(34, 23)
-const BUILDINGS := [
-	{"id": "library", "name": "橡树图书馆", "rect": Rect2i(3, 2, 8, 5), "door": Vector2i(7, 7)},
-	{"id": "cafe", "name": "余烬咖啡馆", "rect": Rect2i(14, 2, 7, 5), "door": Vector2i(17, 7)},
-	{"id": "school", "name": "青藤学堂", "rect": Rect2i(24, 2, 7, 5), "door": Vector2i(27, 7)},
-	{"id": "home_mia", "name": "米娅的小屋", "rect": Rect2i(3, 15, 5, 4), "door": Vector2i(5, 19)},
-	{"id": "home_oliver", "name": "奥利弗的小屋", "rect": Rect2i(11, 15, 5, 4), "door": Vector2i(13, 19)},
-	{"id": "studio", "name": "林间工作室", "rect": Rect2i(19, 15, 5, 4), "door": Vector2i(21, 19)},
-]
-const PLACES := {
-	"library": Vector2i(7, 7), "cafe": Vector2i(17, 7), "school": Vector2i(27, 7),
-	"park": Vector2i(8, 11), "square": Vector2i(17, 12), "lake": Vector2i(27, 17),
-	"home_mia": Vector2i(5, 19), "home_oliver": Vector2i(13, 19), "studio": Vector2i(21, 19)
-}
-const PLACE_NAMES := {
-	"library": "橡树图书馆", "cafe": "余烬咖啡馆", "school": "青藤学堂", "park": "橡树公园",
-	"square": "中央广场", "lake": "月牙湖畔", "home_mia": "米娅的小屋", "home_oliver": "奥利弗的小屋", "studio": "林间工作室"
-}
-const TREE_CELLS := [Vector2i(1, 1), Vector2i(12, 2), Vector2i(22, 2), Vector2i(32, 2), Vector2i(1, 5), Vector2i(32, 6), Vector2i(2, 9), Vector2i(11, 9), Vector2i(22, 9), Vector2i(31, 10), Vector2i(3, 12), Vector2i(11, 12), Vector2i(23, 12), Vector2i(1, 16), Vector2i(9, 16), Vector2i(17, 16), Vector2i(25, 20), Vector2i(2, 21), Vector2i(9, 21), Vector2i(17, 21), Vector2i(23, 21), Vector2i(31, 21)]
+static var definition: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/town.json"))
+static var BUILDINGS: Array = _buildings()
+static var PLACES: Dictionary = _places()
+static var PLACE_NAMES: Dictionary = _names()
+
+static func _buildings() -> Array:
+	var result: Array = []
+	for b in definition.buildings:
+		result.append({"id": b.id, "name": b.name, "rect": Rect2i(b.rect[0], b.rect[1], b.rect[2], b.rect[3]), "door": Vector2i(b.door[0], b.door[1])})
+	return result
+
+static func _places() -> Dictionary:
+	var result: Dictionary = {}
+	for key in definition.places:
+		var point: Array = definition.places[key].cell
+		result[key] = Vector2i(point[0], point[1])
+	return result
+
+static func _names() -> Dictionary:
+	var result: Dictionary = {}
+	for key in definition.places: result[key] = definition.places[key].name
+	return result
 
 var grid := AStarGrid2D.new()
 var blocked: Dictionary = {}
@@ -39,10 +43,10 @@ func _init() -> void:
 			var solid := x == 0 or y == 0 or x == SIZE.x - 1 or y == SIZE.y - 1
 			for b in BUILDINGS:
 				if b.rect.has_point(c): solid = true
-			if (x >= 28 and x <= 31 and y >= 15 and y <= 19): solid = true
-			if c in TREE_CELLS: solid = true
-			# Fountain and benches are solid objects too.
-			if c in [Vector2i(17, 10), Vector2i(18, 10), Vector2i(17, 11), Vector2i(18, 11), Vector2i(6, 10), Vector2i(7, 10), Vector2i(20, 10), Vector2i(21, 10)]: solid = true
+			for r in definition.solid_rects:
+				if Rect2i(r[0], r[1], r[2], r[3]).has_point(c): solid = true
+			for tree in definition.trees:
+				if c == Vector2i(tree[0], tree[1]): solid = true
 			if solid:
 				blocked[c] = true
 				grid.set_point_solid(c)

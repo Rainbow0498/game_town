@@ -1,6 +1,6 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://dwqtuhff2yb5e"]
 
-[ext_resource type="Script" path="res://scripts/town.gd" id="1"]
+[ext_resource type="Script" uid="uid://b4qm3lcktbgn7" path="res://scripts/town.gd" id="1"]
 
-[node name="OakAndEmber" type="Node2D"]
+[node name="OakAndEmber" type="Node2D" unique_id=63221015]
 script = ExtResource("1")

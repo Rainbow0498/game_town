@@ -3,3 +3,7 @@ build/
 test-output/
 *.tmp
 *.log
+.runtime/
+__pycache__/
+*.sqlite3*
+docs/*.import
